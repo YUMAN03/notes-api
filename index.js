@@ -1,60 +1,64 @@
 const express = require('express');
-const fs = require('fs');
 const app = express();
+const pool = require('./db');
 const PORT = 3000;
-const FILE = 'notes.json';
 
 app.use(express.json());
 
-function loadNotes() {
-    return JSON.parse(fs.readFileSync(FILE, 'utf8'));
-}
-
-function saveNotes(notes) {
-    fs.writeFileSync(FILE, JSON.stringify(notes, null, 2));
-}
-
-// Update Note
-app.put('/notes/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    let notes = loadNotes();
-    const noteIndex = notes.findIndex(note => note.id === id);
-
-    if (noteIndex === -1) {
-        return res.status(404).json({ message: 'Note not found' });
-    }
-
-    // Update the note's text (you can expand this for other fields)
-    notes[noteIndex].text = req.body.text;
-    saveNotes(notes);
-    res.json(notes[noteIndex]);
-});
-
-
 // Create Note
-app.post('/notes', (req, res) => {
-    const notes = loadNotes();
-    const note = { id: Date.now(), text: req.body.text };
-    notes.push(note);
-    saveNotes(notes);
-    res.status(201).json(note);
+app.post('/notes', async (req, res) => {
+  try {
+    const id = Date.now();
+    const { text } = req.body;
+    await pool.query('INSERT INTO notes (id, text) VALUES ($1, $2)', [id, text]);
+    res.status(201).json({ id, text });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 // Read Notes
-app.get('/notes', (req, res) => {
-    const notes = loadNotes();
-    res.json(notes);
+app.get('/notes', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM notes ORDER BY id');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Update Note
+app.put('/notes/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { text } = req.body;
+    const result = await pool.query('UPDATE notes SET text = $1 WHERE id = $2 RETURNING *', [text, id]);
+    if (result.rowCount === 0) return res.status(404).json({ message: 'Note not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 // Delete Note
-app.delete('/notes/:id', (req, res) => {
+app.delete('/notes/:id', async (req, res) => {
+  try {
     const id = parseInt(req.params.id);
-    let notes = loadNotes();
-    const newNotes = notes.filter(note => note.id !== id);
-    saveNotes(newNotes);
+    await pool.query('DELETE FROM notes WHERE id = $1', [id]);
     res.json({ message: 'Note deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.get('/', (req, res) => {
+  res.send('Welcome to the Notes API!');
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
