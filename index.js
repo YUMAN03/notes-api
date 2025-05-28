@@ -1,11 +1,16 @@
 const express = require('express');
 const app = express();
 const pool = require('./db');
-const PORT = 3000;
+const PORT = 4000;
+process.on('uncaughtException', err => {
+  console.error('Uncaught Exception:', err);
+});
+process.on('unhandledRejection', err => {
+  console.error('Unhandled Rejection:', err);
+});
 
 app.use(express.json());
 
-// Create Note
 app.post('/notes', async (req, res) => {
   try {
     const id = Date.now();
@@ -18,7 +23,6 @@ app.post('/notes', async (req, res) => {
   }
 });
 
-// Read Notes
 app.get('/notes', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM notes ORDER BY id');
@@ -29,7 +33,6 @@ app.get('/notes', async (req, res) => {
   }
 });
 
-// Update Note
 app.put('/notes/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -43,7 +46,6 @@ app.put('/notes/:id', async (req, res) => {
   }
 });
 
-// Delete Note
 app.delete('/notes/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
